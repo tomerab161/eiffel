@@ -1,0 +1,130 @@
+# Calls the same verify everyone runs locally (D17). IMAX-kit: pnpm + Node 24, Playwright Chromium for the e2e gate.
+# This file is a gate file (integrity.gateFiles): protect it with CODEOWNERS (docs/branch-protection.md),
+# because a PR runs the workflow from its own branch.
+name: verify
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    # labeled/unlabeled: re-run when a maintainer adds or removes gate-change-approved or big-change-reviewed.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  schedule:
+    - cron: '0 2 * * *' # nightly full mutation run (D8) and dependency scan (D30)
+
+jobs:
+  verify:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read # label events
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v6
+        with: { fetch-depth: 0 }
+      - uses: pnpm/action-setup@v5 # version from package.json → packageManager
+      - uses: actions/setup-node@v6
+        with: { node-version: 24, cache: pnpm }
+      # A label counts only if the person who last added it has admin or maintain permission on this repo (D39).
+      # gate-change-approved waives the integrity gate's gate-file check; big-change-reviewed lets a big change
+      # pass classify (D51). Anyone else's label, or no label, is ignored.
+      - name: check who added the approval labels
+        id: approval
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          approved() {
+            case ",$LABELS," in *",$1,"*) ;; *) echo 0; return ;; esac
+            actor=$(gh api --paginate "repos/$REPO/issues/$PR/events" \
+              --jq ".[] | select(.event == \"labeled\" and .label.name == \"$1\") | .actor.login" | tail -n 1)
+            role=none
+            if [ -n "$actor" ]; then role=$(gh api "repos/$REPO/collaborators/$actor/permission" --jq '.role_name'); fi
+            echo "$1 was last added by ${actor:-nobody} (role: $role)" >&2
+            case "$role" in
+              admin|maintain) echo 1 ;;
+              *) echo 0; echo "$1 ignored: it needs an admin or maintainer" >&2 ;;
+            esac
+          }
+          echo "gate=$(approved gate-change-approved)" >> "$GITHUB_OUTPUT"
+          echo "big=$(approved big-change-reviewed)" >> "$GITHUB_OUTPUT"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: node agent-kit/scripts/verify.mjs full
+        env:
+          AGENT_KIT_BASE: ${{ github.base_ref || 'main' }}
+          AGENT_KIT_GATE_CHANGE_APPROVED: ${{ steps.approval.outputs.gate == '1' && '1' || '0' }}
+      - name: classify change size and review needed
+        if: github.event_name == 'pull_request'
+        run: node agent-kit/scripts/classify.mjs
+        env:
+          AGENT_KIT_BASE: ${{ github.base_ref }}
+          AGENT_KIT_BIG_APPROVED: ${{ steps.approval.outputs.big == '1' && '1' || '0' }}
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with: { name: reports, path: 'reports/', if-no-files-found: ignore }
+
+  # Post-merge only (D33): the knowledge base is updated AFTER a merge, so verify never runs this gate.
+  # The vault is local-only by default (Obsidian Sync, outside the repo), so CI cannot see it or run the
+  # Knowledge agent. CI can only (a) check a git mirror of the vault, if you keep one, for links, coverage of
+  # every source folder and reachability from Home (freshness against the merged range is local-only), and
+  # (b) remind you to run `node agent-kit/scripts/orchestrate.mjs knowledge` on main after pulling.
+  knowledge:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions: { contents: read }
+    env:
+      VAULT_REPO: ${{ vars.KNOWLEDGE_VAULT_REPO }} # optional, e.g. owner/my-project-knowledge
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6
+        if: env.VAULT_REPO != ''
+        with:
+          repository: ${{ vars.KNOWLEDGE_VAULT_REPO }}
+          token: ${{ secrets.KNOWLEDGE_VAULT_TOKEN }}
+          path: .knowledge-vault
+      - name: knowledge gate (links, coverage, reachability) on the vault mirror
+        if: env.VAULT_REPO != ''
+        run: node agent-kit/scripts/knowledge-gate.mjs
+        env: { AGENT_KIT_KNOWLEDGE_DIR: '${{ github.workspace }}/.knowledge-vault' }
+      - name: remind to run the Knowledge stage locally
+        if: always()
+        run: |
+          msg="Merged to main. Update the knowledge base locally: git switch main && git pull && node agent-kit/scripts/orchestrate.mjs knowledge"
+          [ -n "$VAULT_REPO" ] || msg="$msg (CI has no vault mirror, so it checked nothing in the knowledge base)"
+          echo "::notice title=knowledge (post-merge)::$msg"
+          echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+
+  nightly-mutation:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5 # version from package.json → packageManager
+      - uses: actions/setup-node@v6
+        with: { node-version: 24, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      # Runs gates.mutation (mutation-run.mjs, then mutation-gate.mjs). AGENT_KIT_MUTATION_SCOPE=all makes
+      # mutation-run.mjs mutate the whole codebase, ignoring the incremental cache.
+      - run: node agent-kit/scripts/verify.mjs --only mutation
+        env: { AGENT_KIT_MUTATION_SCOPE: all }
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with: { name: nightly-mutation-report, path: reports/mutation/, if-no-files-found: ignore }
+
+  nightly-audit:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5 # version from package.json → packageManager
+      - uses: actions/setup-node@v6
+        with: { node-version: 24, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      # New advisories appear without code changes, so the dependency scan also runs nightly (D30).
+      - run: node agent-kit/scripts/verify.mjs security
+        env: { AGENT_KIT_DEPS_SCOPE: all }

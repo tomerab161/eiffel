@@ -1,0 +1,19 @@
+{
+  "name": "@app/domain",
+  "description": "Shared contracts and pure rules: Zod schemas, constants, rules. Zod is the only runtime dependency. No framework, no I/O.",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  }
+}

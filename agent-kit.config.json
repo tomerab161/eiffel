@@ -1,0 +1,402 @@
+{
+  "profile": "fullstack",
+  "baseBranch": "main",
+  "review": {
+    "mode": "strict",
+    "hunters": 3,
+    "onFix": true,
+    "specCritic": true,
+    "testFiles": [
+      "**/*.test.{ts,tsx}"
+    ]
+  },
+  "thresholds": {
+    "complexity": 6,
+    "crap": 6,
+    "functionLines": 40,
+    "fileLines": 300,
+    "mutationScore": 80
+  },
+  "gates": {
+    "spec": "node agent-kit/scripts/spec-gate.mjs",
+    "lint": "pnpm exec biome ci --error-on-warnings . && pnpm exec eslint -c eslint.style.config.mjs --max-warnings 0 packages apps",
+    "typecheck": "pnpm exec turbo run typecheck --output-logs=errors-only",
+    "test": "pnpm exec vitest run",
+    "arch": "pnpm exec depcruise packages apps --config .dependency-cruiser.cjs",
+    "quality": "pnpm exec vitest run --coverage --silent && node agent-kit/scripts/quality-gate.mjs",
+    "audit": "node agent-kit/scripts/deps-scan.mjs && node agent-kit/scripts/deps-gate.mjs",
+    "sast": "node agent-kit/scripts/sast.mjs",
+    "mutation": "node agent-kit/scripts/mutation-run.mjs && node agent-kit/scripts/mutation-gate.mjs",
+    "integrity": "node agent-kit/scripts/integrity-gate.mjs",
+    "map": "node agent-kit/scripts/map.mjs --check",
+    "build": "pnpm exec turbo run build --output-logs=errors-only",
+    "knowledge": "node agent-kit/scripts/knowledge-gate.mjs",
+    "qa": "node agent-kit/scripts/qa-gate.mjs",
+    "e2e": "pnpm exec playwright test --config apps/web/playwright.config.ts",
+    "review": "node agent-kit/scripts/review-gate.mjs"
+  },
+  "verify": {
+    "fast": [
+      "spec",
+      "lint",
+      "typecheck",
+      "test",
+      "arch"
+    ],
+    "quality": [
+      "quality"
+    ],
+    "security": [
+      "audit",
+      "sast"
+    ],
+    "qa": [
+      "qa",
+      "e2e"
+    ],
+    "full": [
+      "mutation",
+      "integrity",
+      "map",
+      "build"
+    ],
+    "review": [
+      "review"
+    ],
+    "required": [
+      "spec",
+      "lint",
+      "typecheck",
+      "test",
+      "arch",
+      "quality",
+      "audit",
+      "sast",
+      "mutation",
+      "integrity",
+      "map",
+      "build",
+      "qa",
+      "e2e",
+      "review"
+    ]
+  },
+  "quality": {
+    "include": [
+      "packages/*/src/**/*.ts",
+      "apps/*/src/**/*.{ts,tsx}"
+    ],
+    "exclude": [
+      "**/*.{test,steps,support}.{ts,tsx}",
+      "**/*.d.ts",
+      "**/index.ts",
+      "**/main.tsx",
+      "**/server.ts"
+    ]
+  },
+  "sast": {
+    "paths": [
+      "packages",
+      "apps"
+    ],
+    "eslintConfig": "eslint.security.config.mjs",
+    "allowlistFile": ".agent-kit/security-allowlist.json"
+  },
+  "classify": {
+    "bigLines": 100,
+    "protectedPaths": [
+      "agent-kit/**",
+      "agent-kit.config.json",
+      "AGENTS.md",
+      "CLAUDE.md",
+      ".claude/**",
+      ".claude/hooks/**",
+      ".agent-kit/**",
+      ".github/**",
+      ".gitlab-ci.yml",
+      "package.json",
+      "**/package.json",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "turbo.json",
+      "biome.json",
+      ".dependency-cruiser.cjs",
+      "stryker.config.json",
+      "eslint.security.config.mjs",
+      ".secretlintrc.json",
+      "tsconfig*.json",
+      "**/tsconfig*.json",
+      "vitest.config.ts",
+      "**/vitest.config.ts",
+      "**/vite.config.ts",
+      "packages/domain/**",
+      "apps/web/src/app/**",
+      "apps/web/src/{clients,components,hooks,types,lib,constants}/**",
+      "apps/web/src/features/*/index.{ts,tsx}",
+      "apps/api/src/app.ts",
+      "apps/api/src/{shared,plugins,config,db}/**",
+      "**/auth/**",
+      "**/security/**",
+      ".npmrc",
+      ".agent-kit/security-allowlist.json",
+      "**/playwright.config.ts",
+      "eslint.style.config.mjs"
+    ],
+    "ignore": [
+      "pnpm-lock.yaml",
+      "**/*.{test,steps,support}.{ts,tsx}",
+      "**/*.feature",
+      "docs/architecture.md",
+      "**/*.snap",
+      "qa/**/*.md",
+      "apps/web/e2e/**"
+    ]
+  },
+  "integrity": {
+    "gateFiles": [
+      "agent-kit/**",
+      "agent-kit.config.json",
+      ".claude/settings.json",
+      ".claude/hooks/**",
+      ".claude/usage.mjs",
+      ".agent-kit/mutation-baseline.json",
+      ".agent-kit/security-allowlist.*",
+      ".dependency-cruiser.cjs",
+      "stryker.config.json",
+      "biome.json",
+      "eslint.security.config.mjs",
+      ".secretlintrc.json",
+      "vitest.config.ts",
+      "**/vitest.config.ts",
+      "tsconfig.base.json",
+      "tsconfig.depcruise.json",
+      "turbo.json",
+      "pnpm-workspace.yaml",
+      ".npmrc",
+      "**/playwright.config.ts",
+      "eslint.style.config.mjs",
+      ".github/**",
+      ".gitlab-ci.yml",
+      ".gitlab/**",
+      "CODEOWNERS"
+    ],
+    "forbiddenPatterns": [
+      "\\.(skip|only)\\(",
+      "(^|[^.\\w])(xit|fit|xdescribe|fdescribe|xtest)\\(",
+      "biome-ignore",
+      "eslint-disable",
+      "oxlint-disable",
+      "secretlint-disable",
+      "\\bnosec\\b",
+      "Stryker disable",
+      "@ts-ignore",
+      "@ts-expect-error",
+      "@ts-nocheck",
+      "\\b(it|test|describe|Scenario|ScenarioOutline|Rule)\\.(skip|only|todo)\\b",
+      "\\bx(it|describe)\\(",
+      "\\bf(it|describe)\\(",
+      "(ignore-)?min(imum)?[-_]?release[-_]?age"
+    ],
+    "scanGlobs": [
+      "**/*.{ts,tsx,js,mjs,cjs}",
+      "**/package.json",
+      ".npmrc",
+      "**/*.{yml,yaml}"
+    ],
+    "forbiddenFiles": [
+      "**/.env",
+      "**/.env.*",
+      "**/*.pem",
+      "**/*.key"
+    ],
+    "allowedFiles": [
+      "**/.env.example"
+    ]
+  },
+  "git": {
+    "protectedBranches": []
+  },
+  "spec": {
+    "minSteps": 2,
+    "maxSteps": 6
+  },
+  "scope": {
+    "testFiles": [
+      "**/*.{test,steps,support}.{ts,tsx}",
+      "apps/web/e2e/**/*.spec.ts"
+    ],
+    "assertionPattern": "\\b(expect|assert)\\b",
+    "dependencyFiles": [
+      "package.json",
+      "**/package.json",
+      "pnpm-lock.yaml"
+    ],
+    "roles": {
+      "specifier": {
+        "only": [
+          "**/*.feature",
+          "@procedures"
+        ]
+      },
+      "coder": {
+        "frozen": [
+          "**/*.feature",
+          "@procedures",
+          "@dependencies"
+        ]
+      },
+      "fix": {
+        "frozen": [
+          "@dependencies"
+        ]
+      },
+      "architect": {
+        "frozen": [
+          "**/*.feature",
+          "@procedures",
+          "@dependencies"
+        ],
+        "keepAssertions": true
+      },
+      "security": {
+        "frozen": [
+          "**/*.feature",
+          "@procedures"
+        ],
+        "keepAssertions": true
+      },
+      "hardener": {
+        "frozen": [
+          "**/*.feature",
+          "@procedures",
+          "@dependencies"
+        ],
+        "keepAssertions": true
+      },
+      "qa": {
+        "frozen": [
+          "**/*.feature",
+          "@procedures",
+          "@dependencies"
+        ],
+        "keepAssertions": true
+      }
+    }
+  },
+  "qa": {
+    "procedures": [
+      "qa/**/*.md"
+    ],
+    "scripts": [
+      "apps/web/e2e/**/*.spec.ts"
+    ],
+    "marker": "qa-procedure:"
+  },
+  "security": {
+    "deps": {
+      "findingsFile": "reports/security/deps.json",
+      "allowlistFile": ".agent-kit/security-allowlist.json",
+      "failOn": {
+        "prod": "high",
+        "dev": "high"
+      },
+      "licenses": {
+        "deny": []
+      },
+      "manifests": [
+        "package.json",
+        "**/package.json",
+        "pnpm-lock.yaml"
+      ],
+      "offlineDb": null
+    }
+  },
+  "mutation": {
+    "reportFile": "reports/mutation/mutation.json",
+    "baselineFile": ".agent-kit/mutation-baseline.json",
+    "allowEmpty": false
+  },
+  "map": {
+    "outFile": "docs/architecture.md",
+    "packageDirs": [
+      "packages",
+      "apps"
+    ],
+    "domainSrc": "packages/domain/src",
+    "apiModules": "apps/api/src/modules",
+    "webFeatures": "apps/web/src/features"
+  },
+  "knowledge": {
+    "enabled": true,
+    "dir": "~/vaults/imax-test-knowledge",
+    "conventions": "_conventions.md",
+    "syncFile": ".agent-kit-sync.json",
+    "sources": {
+      "features": "apps/web/src/features/*",
+      "modules": "apps/api/src/modules/*",
+      "domain": "packages/domain/src/*",
+      "shared": [
+        "apps/web/src/{clients,components,hooks,types,lib,constants}",
+        "apps/api/src/{shared,plugins,config,db}"
+      ]
+    }
+  },
+  "pipeline": {
+    "maxAttempts": 3,
+    "specifier": {
+      "gate": "node agent-kit/scripts/verify.mjs --only spec"
+    },
+    "coder": {
+      "gate": "node agent-kit/scripts/verify.mjs fast"
+    },
+    "architect": {
+      "gate": "node agent-kit/scripts/verify.mjs quality"
+    },
+    "security": {
+      "gate": "node agent-kit/scripts/verify.mjs security"
+    },
+    "hardener": {
+      "gate": "node agent-kit/scripts/verify.mjs full"
+    },
+    "qa": {
+      "gate": "node agent-kit/scripts/verify.mjs qa"
+    },
+    "reviewer": {
+      "gate": "node agent-kit/scripts/verify.mjs review"
+    },
+    "fixGate": "node agent-kit/scripts/verify.mjs full"
+  },
+  "pr": {
+    "open": "git push -u origin \"$AGENT_KIT_BRANCH\" && gh pr create --draft --head \"$AGENT_KIT_BRANCH\" --title \"$AGENT_KIT_PR_TITLE\" --body-file \"$AGENT_KIT_PR_BODY\""
+  },
+  "usage": {
+    "read": "node .claude/usage.mjs \"$AGENT_KIT_AGENT_OUTPUT\"",
+    "notes": true
+  },
+  "agent": {
+    "command": [
+      "claude",
+      "-p",
+      "{prompt}",
+      "--agent",
+      "{role}",
+      "--permission-mode",
+      "acceptEdits",
+      "--allowedTools",
+      "Bash(node agent-kit/scripts/*),Bash(pnpm test:*),Bash(pnpm lint:*),Bash(pnpm format:*),Bash(pnpm typecheck:*),Bash(pnpm build:*),Bash(pnpm e2e:*),Bash(pnpm exec vitest:*),Bash(pnpm exec biome:*),Bash(pnpm exec tsc:*),Bash(pnpm exec turbo run:*),Bash(pnpm exec depcruise:*),Bash(pnpm exec stryker run:*),Bash(pnpm exec playwright test:*),Bash(pnpm exec playwright show-report:*),Bash(pnpm exec eslint:*),Bash(pnpm exec secretlint:*),Bash(pnpm audit:*),Bash(pnpm list:*),Bash(pnpm why:*),Bash(pnpm outdated:*),Bash(pnpm update:*),Bash(pnpm install --frozen-lockfile:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git blame:*),Bash(ls:*)",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "{dirs}"
+    ],
+    "addDirFlag": "--add-dir",
+    "timeoutMs": 1800000,
+    "unsetEnv": [
+      "CLAUDECODE"
+    ]
+  },
+  "tracker": {
+    "read": null,
+    "closeLine": null
+  }
+}

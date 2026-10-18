@@ -1,0 +1,6 @@
+{
+  "$comment": "Human-owned (integrity gate, protected path). Agents never edit it. deps: {id, package, reason, approvedBy, expires}. eslint: {files, rule, reason, approvedBy}. secretlint: {files, reason, approvedBy}.",
+  "deps": [],
+  "eslint": [],
+  "secretlint": []
+}
