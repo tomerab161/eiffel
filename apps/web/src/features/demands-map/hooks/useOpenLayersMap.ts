@@ -1,3 +1,4 @@
+import { getCenter } from 'ol/extent.js';
 import Feature from 'ol/Feature.js';
 import OlPolygon from 'ol/geom/Polygon.js';
 import VectorLayer from 'ol/layer/Vector.js';
@@ -36,7 +37,8 @@ interface MapParts {
 
 /** Longitude 0, latitude 0 in the map's projection (EPSG:3857), exactly: projecting it can leave a rounding error. */
 const WORLD_CENTER: [x: number, y: number] = [0, 0];
-const FIT_PADDING = [FIT_PADDING_PX, FIT_PADDING_PX, FIT_PADDING_PX, FIT_PADDING_PX];
+/** The padding is left on both sides of each axis. */
+const BOTH_SIDES = 2;
 
 const styles = {
   plain: new Style({
@@ -78,12 +80,13 @@ const featureOf = (demand: Demand, index: number): Feature<OlPolygon> =>
 const frameExtent = (map: OlMap, { west, south, east, north }: Extent): void => {
   const [width = 0, height = 0] = map.getSize() ?? [];
   const size = mapSizeOf(width, height);
+  const view = map.getView();
+  const projected = transformExtent([west, south, east, north], 'EPSG:4326', 'EPSG:3857');
+  const room = [size.width - BOTH_SIDES * FIT_PADDING_PX, size.height - BOTH_SIDES * FIT_PADDING_PX];
+  const resolution = Math.max(view.getResolutionForExtent(projected, room), view.getResolutionForZoom(MAX_ZOOM));
 
-  map.getView().fit(transformExtent([west, south, east, north], 'EPSG:4326', 'EPSG:3857'), {
-    size: [size.width, size.height],
-    padding: FIT_PADDING,
-    maxZoom: MAX_ZOOM,
-  });
+  view.setResolution(resolution);
+  view.setCenter(getCenter(projected));
 };
 
 /** Draws the map into the element and reports each click's position; returns how to detach it again. */
