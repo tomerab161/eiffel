@@ -1,10 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
+import type Feature from 'ol/Feature.js';
+import OlPolygon from 'ol/geom/Polygon.js';
+import VectorLayer from 'ol/layer/Vector.js';
+import type OlMap from 'ol/Map.js';
+import MapBrowserEvent from 'ol/MapBrowserEvent.js';
 import { expect, vi } from 'vitest';
 
 import { DemandsPage } from '../components/index.ts';
+import { openLayersMapOf } from '../hooks/index.ts';
+import { mapSizeOf } from '../lib/index.ts';
 
 /** A demand as the step tables and files describe it, with its area as [west, south, east, north]. */
 interface SampleDemand {
@@ -26,13 +33,14 @@ interface ShownView {
   centerX: number;
   centerY: number;
   zoom: number;
+  /** Metres per pixel. */
+  resolution: number;
   width: number;
   height: number;
 }
 
 const SHIPPED_FILE = resolve(import.meta.dirname, '../../../../public/demands.geojson');
 const EARTH_RADIUS_M = 6_378_137;
-const TILE_SIZE_PX = 256;
 const FRAMED_SHARE = 0.8;
 
 const rectangleOf = ([west, south, east, north]: SampleDemand['box']): number[][] => [
@@ -86,16 +94,35 @@ const openDemandsPage = (): void => {
 
 const mapElement = (): Element => screen.getByRole('img', { name: 'Map of demands' });
 
+/** The OpenLayers map drawn into the map element. The test DOM cannot draw a canvas, so steps read the map's state. */
+const olMap = (): OlMap => {
+  const map = openLayersMapOf(mapElement());
+
+  if (!map) {
+    throw new Error('the map element holds no OpenLayers map');
+  }
+
+  return map;
+};
+
+/** The size the map frames for: its own, or the default where the test DOM gives it none. */
+const mapSize = (map: OlMap): { width: number; height: number } => {
+  const [width = 0, height = 0] = map.getSize() ?? [];
+
+  return mapSizeOf(width, height);
+};
+
 const shownView = (): ShownView => {
-  const map = mapElement();
-  const read = (name: string): number => Number(map.getAttribute(`data-${name}`));
+  const map = olMap();
+  const view = map.getView();
+  const [centerX = Number.NaN, centerY = Number.NaN] = view.getCenter() ?? [];
 
   return {
-    centerX: read('center-x'),
-    centerY: read('center-y'),
-    zoom: read('zoom'),
-    width: read('width'),
-    height: read('height'),
+    centerX,
+    centerY,
+    zoom: view.getZoom() ?? Number.NaN,
+    resolution: view.getResolution() ?? Number.NaN,
+    ...mapSize(map),
   };
 };
 
@@ -104,36 +131,29 @@ const project = ([lon, lat]: [number, number]): [number, number] => [
   EARTH_RADIUS_M * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360)),
 ];
 
-const metresPerPixel = (view: ShownView): number => (2 * Math.PI * EARTH_RADIUS_M) / TILE_SIZE_PX / 2 ** view.zoom;
-
-/** The client pixel where the map shows a position (the map sits at the page's top-left in the test DOM). */
-const pixelOf = (position: [number, number]): { clientX: number; clientY: number } => {
-  const view = shownView();
-  const [x, y] = project(position);
-  const resolution = metresPerPixel(view);
-
-  return {
-    clientX: (x - view.centerX) / resolution + view.width / 2,
-    clientY: (view.centerY - y) / resolution + view.height / 2,
-  };
-};
-
 const boxCenter = ({ box: [west, south, east, north] }: SampleDemand): [number, number] => [
   (west + east) / 2,
   (south + north) / 2,
 ];
 
+/** A click on the map at a position, as OpenLayers reports it once it has turned the pointer into a coordinate. */
 const clickMapAt = (position: [number, number]): void => {
-  fireEvent.click(mapElement(), pixelOf(position));
+  const map = olMap();
+  const click = new MapBrowserEvent('click', map, new PointerEvent('click'));
+
+  click.coordinate = project(position);
+  act(() => {
+    map.dispatchEvent(click);
+  });
 };
 
+/** Drags the map: the view moves by 200 by 120 pixels, as an OpenLayers drag-pan moves it. */
 const panMap = (): void => {
-  const map = mapElement();
+  const view = olMap().getView();
+  const [x = 0, y = 0] = view.getCenter() ?? [];
+  const resolution = view.getResolution() ?? 1;
 
-  fireEvent.pointerDown(map, { clientX: 100, clientY: 100 });
-  fireEvent.pointerMove(map, { clientX: 250, clientY: 180 });
-  fireEvent.pointerMove(map, { clientX: 300, clientY: 220 });
-  fireEvent.pointerUp(map, { clientX: 300, clientY: 220 });
+  view.setCenter([x - 200 * resolution, y + 120 * resolution]);
 };
 
 const extentOfBoxes = (demands: SampleDemand[]): Extent => ({
@@ -146,7 +166,7 @@ const extentOfBoxes = (demands: SampleDemand[]): Extent => ({
 /** The view holds the whole extent, and the extent spans at least 80% of its width or of its height. */
 const expectFrames = (extent: Extent): void => {
   const view = shownView();
-  const resolution = metresPerPixel(view);
+  const { resolution } = view;
   const [west, south] = project([extent.west, extent.south]);
   const [east, north] = project([extent.east, extent.north]);
   const halfWidth = (view.width / 2) * resolution;
@@ -165,12 +185,15 @@ const bodyRows = (): HTMLElement[] => screen.queryAllByRole('row').filter((row) 
 const highlightedRows = (): number[] =>
   bodyRows().flatMap((row, index) => (row.getAttribute('aria-selected') === 'true' ? [index] : []));
 
-const polygons = (): Element[] => [...mapElement().querySelectorAll('path[data-demand-index]')];
+/** The demand polygons on the map's vector layers, in the order the map draws them. */
+const polygons = (): Feature[] =>
+  olMap()
+    .getAllLayers()
+    .flatMap((layer) => (layer instanceof VectorLayer ? (layer.getSource()?.getFeatures() ?? []) : []))
+    .filter((feature) => feature.getGeometry() instanceof OlPolygon);
 
 const highlightedPolygons = (): number[] =>
-  polygons().flatMap((polygon) =>
-    polygon.getAttribute('data-highlighted') === 'true' ? [Number(polygon.getAttribute('data-demand-index'))] : [],
-  );
+  polygons().flatMap((polygon) => (polygon.get('highlighted') === true ? [Number(polygon.get('demandIndex'))] : []));
 
 export type { Extent, SampleDemand, ShownView };
 export {

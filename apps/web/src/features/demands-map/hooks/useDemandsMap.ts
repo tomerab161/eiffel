@@ -1,37 +1,32 @@
-import { useState } from 'react';
+import { type RefObject, useState } from 'react';
 
 import type { Demand, Position } from '@app/domain';
-import {
-  demandExtent,
-  fitExtent,
-  INITIAL_SELECTION,
-  initialView,
-  type MapSize,
-  type MapView,
-  type Pixel,
-  panBy,
-  type Selection,
-  selectAtPoint,
-  selectDemand,
-  zoomBy,
-} from '../lib/index.ts';
+import { demandExtent, INITIAL_SELECTION, type Selection, selectAtPoint, selectDemand } from '../lib/index.ts';
+import { useOpenLayersMap } from './useOpenLayersMap.ts';
 
 interface DemandsMap {
   selection: Selection;
-  view: MapView;
+  /** The element the OpenLayers map draws into. */
+  mapRef: RefObject<HTMLDivElement | null>;
   /** Selects a demand from the table and frames the map on it. */
   selectRow: (index: number) => void;
-  /** Selects the demand at a point on the map, and returns what is selected afterwards. The view stays. */
-  pickAt: (point: Position) => Selection;
-  zoom: (steps: number) => void;
-  pan: (move: Pixel) => void;
 }
 
-/** Thin: holds the selection and the map view. The rules live in lib/. */
-const useDemandsMap = (demands: readonly Demand[], size: MapSize): DemandsMap => {
+/**
+ * Thin: holds the selection and wires it to the OpenLayers map. A click on the map selects the demand there (the view
+ * stays) and reports what is selected afterwards. The rules live in lib/.
+ */
+const useDemandsMap = (demands: readonly Demand[], onPicked: (selection: Selection) => void): DemandsMap => {
   const [selection, setSelection] = useState<Selection>(INITIAL_SELECTION);
-  const [movedView, setMovedView] = useState<MapView | undefined>(undefined);
-  const view = movedView ?? initialView(demands, size);
+
+  const pick = (point: Position): void => {
+    const next = selectAtPoint(selection, demands, point);
+
+    setSelection(next);
+    onPicked(next);
+  };
+
+  const { targetRef, frame } = useOpenLayersMap({ demands, selection, onPick: pick });
 
   const selectRow = (index: number): void => {
     const demand = demands.find((_, position) => position === index);
@@ -39,26 +34,11 @@ const useDemandsMap = (demands: readonly Demand[], size: MapSize): DemandsMap =>
     setSelection(selectDemand(selection, index));
 
     if (demand) {
-      setMovedView(fitExtent(demandExtent(demand), size));
+      frame(demandExtent(demand));
     }
   };
 
-  const pickAt = (point: Position): Selection => {
-    const next = selectAtPoint(selection, demands, point);
-
-    setSelection(next);
-
-    return next;
-  };
-
-  return {
-    selection,
-    view,
-    selectRow,
-    pickAt,
-    zoom: (steps) => setMovedView(zoomBy(view, steps)),
-    pan: (move) => setMovedView((current) => panBy(current ?? view, move)),
-  };
+  return { selection, mapRef: targetRef, selectRow };
 };
 
 export type { DemandsMap };

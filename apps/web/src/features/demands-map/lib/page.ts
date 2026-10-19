@@ -1,5 +1,10 @@
-import { DEFAULT_MAP_SIZE, EMPTY_TEXT, ERROR_TEXT, LOADING_TEXT, ZOOM_KEYS } from '../constants.ts';
-import type { MapSize } from './map-view.ts';
+import { DEFAULT_MAP_SIZE, EMPTY_TEXT, ERROR_TEXT, LOADING_TEXT } from '../constants.ts';
+
+/** The map's size in pixels. */
+interface MapSize {
+  width: number;
+  height: number;
+}
 
 interface DemandsState {
   isPending: boolean;
@@ -24,7 +29,5 @@ const mapSizeOf = (width: number, height: number): MapSize =>
 /** A demand is known by its position in the list, so rows are keyed by it. */
 const rowKeys = (count: number): string[] => Array.from({ length: count }, (_, index) => `demand-${index}`);
 
-/** How many zoom steps a key press on the map asks for, if it is a zoom key. */
-const zoomStepsForKey = (key: string): number | undefined => ZOOM_KEYS.get(key);
-
-export { demandsMessage, mapSizeOf, rowKeys, zoomStepsForKey };
+export type { MapSize };
+export { demandsMessage, mapSizeOf, rowKeys };

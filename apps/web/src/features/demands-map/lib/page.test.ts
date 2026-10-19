@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 
-import { demandsMessage, mapSizeOf, rowKeys, zoomStepsForKey } from './page.ts';
+import { demandsMessage, mapSizeOf, rowKeys } from './page.ts';
 
 // Flat tests (no describe blocks): mutation testing measures these. See AGENTS.md → Tests.
 
@@ -32,23 +32,6 @@ it('falls back to the default size when the map has no width or no height', () =
   expect(mapSizeOf(0, 300)).toEqual({ width: 800, height: 600 });
   expect(mapSizeOf(300, 0)).toEqual({ width: 800, height: 600 });
 });
-
-it.each([
-  ['+', 1],
-  ['=', 1],
-  ['-', -1],
-  ['a', undefined],
-  ['Enter', undefined],
-])('the key %s zooms the map by %s', (key, steps) => {
-  expect(zoomStepsForKey(key)).toBe(steps);
-});
-
-it.each(['constructor', 'toString', '__proto__', 'hasOwnProperty'])(
-  'the key %s, a name every object inherits, does not zoom the map',
-  (key) => {
-    expect(zoomStepsForKey(key)).toBeUndefined();
-  },
-);
 
 it('keys rows by their position, so demands with the same name stay apart', () => {
   expect(rowKeys(3)).toEqual(['demand-0', 'demand-1', 'demand-2']);

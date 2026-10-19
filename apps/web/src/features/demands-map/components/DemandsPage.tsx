@@ -1,8 +1,8 @@
 import { type CSSProperties, type ReactElement, useRef } from 'react';
 
-import type { Demand, Position } from '@app/domain';
-import { useDemands, useDemandsMap, useElementSize } from '../hooks/index.ts';
-import { demandsMessage } from '../lib/index.ts';
+import type { Demand } from '@app/domain';
+import { useDemands, useDemandsMap } from '../hooks/index.ts';
+import { demandsMessage, type Selection } from '../lib/index.ts';
 import { DemandsMap } from './DemandsMap.tsx';
 import { DemandsTable } from './DemandsTable.tsx';
 
@@ -27,31 +27,19 @@ const layoutStyle: CSSProperties = { display: 'flex', flexDirection: 'row', flex
 const DemandsPage = (): ReactElement => {
   const { data, isPending, isError } = useDemands();
   const demands = data ?? NO_DEMANDS;
-  const mapRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
-  const size = useElementSize(mapRef);
-  const map = useDemandsMap(demands, size);
 
-  const pick = (point: Position): void => {
-    const picked = map.pickAt(point);
-
+  const scrollToRow = (picked: Selection): void => {
     tableRef.current?.querySelector(`tr[data-demand-index="${picked}"]`)?.scrollIntoView({ block: 'nearest' });
   };
+
+  const map = useDemandsMap(demands, scrollToRow);
 
   return (
     <main style={pageStyle}>
       <h1 style={titleStyle}>Demands</h1>
       <div style={layoutStyle} data-layout>
-        <DemandsMap
-          demands={demands}
-          selection={map.selection}
-          view={map.view}
-          size={size}
-          containerRef={mapRef}
-          onPick={pick}
-          onZoom={map.zoom}
-          onPan={map.pan}
-        />
+        <DemandsMap mapRef={map.mapRef} />
         <DemandsTable
           demands={demands}
           selection={map.selection}
