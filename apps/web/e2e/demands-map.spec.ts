@@ -52,10 +52,23 @@ const PLAIN = 1;
 const HIGHLIGHTED = 2;
 const NEIGHBOURS = [-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dx) => [dx, dy] as const));
 
+/** How much bluer than red a pixel must be to count as a plain demand: any blue, its fill included. */
+const ANY_BLUE = 50;
+/**
+ * Only the dark-blue outline. Zoomed out to all demands, each polygon is a few pixels of outline, and two demands a
+ * pixel apart (Andes Copper Prospect and Atacama Lithium Flats) are told apart by the lighter pixels between them.
+ */
+const OUTLINE_BLUE = 110;
+
 /** Amber (the highlighted style) is much redder than blue; blue (the plain style) is much bluer than red. */
-const plainOrNone = (r: number, b: number): number => (b > r + 50 ? PLAIN : NONE);
-const kindOf = (r: number, g: number, b: number): number =>
-  r > b + 80 && r > g + 30 ? HIGHLIGHTED : plainOrNone(r, b);
+const plainOrNone = (r: number, b: number, blueMargin: number): number => (b > r + blueMargin ? PLAIN : NONE);
+type ColourKind = (r: number, g: number, b: number) => number;
+type PixelKind = (index: number) => number;
+
+const kindOf =
+  (blueMargin: number): ColourKind =>
+  (r, g, b) =>
+    r > b + 80 && r > g + 30 ? HIGHLIGHTED : plainOrNone(r, b, blueMargin);
 
 const inside = (x: number, y: number, box: Box): boolean =>
   x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
@@ -79,16 +92,21 @@ const pixelsOf = async (page: Page, png: Buffer): Promise<Pixels> => {
   return { width: decoded.width, height: decoded.height, rgba: Buffer.from(decoded.raw, 'base64') };
 };
 
-const kindAt = ({ width, rgba }: Pixels, masks: readonly Box[], index: number): number => {
-  const x = index % width;
-  const y = Math.floor(index / width);
-  const masked = masks.some((mask) => inside(x, y, mask));
+const kindAt =
+  ({ width, rgba }: Pixels, masks: readonly Box[], colourKind: ColourKind): PixelKind =>
+  (index) => {
+    const x = index % width;
+    const y = Math.floor(index / width);
+    const masked = masks.some((mask) => inside(x, y, mask));
 
-  return masked ? NONE : kindOf(rgba[index * 4] ?? 0, rgba[index * 4 + 1] ?? 0, rgba[index * 4 + 2] ?? 0);
+    return masked ? NONE : colourKind(rgba[index * 4] ?? 0, rgba[index * 4 + 1] ?? 0, rgba[index * 4 + 2] ?? 0);
+  };
+
+const classify = (pixels: Pixels, masks: readonly Box[], blueMargin: number): Uint8Array => {
+  const kindOfPixel = kindAt(pixels, masks, kindOf(blueMargin));
+
+  return Uint8Array.from({ length: pixels.width * pixels.height }, (_, index) => kindOfPixel(index));
 };
-
-const classify = (pixels: Pixels, masks: readonly Box[]): Uint8Array =>
-  Uint8Array.from({ length: pixels.width * pixels.height }, (_, index) => kindAt(pixels, masks, index));
 
 const neighboursOf = (index: number, width: number, height: number): number[] => {
   const x = index % width;
@@ -176,7 +194,7 @@ const controlMasks = async (map: Locator): Promise<Box[]> => {
 };
 
 /** Takes a picture of the map once it has stopped moving (two equal screenshots in a row). */
-const lookAtMap = async (page: Page): Promise<MapPicture> => {
+const lookAtMap = async (page: Page, blueMargin: number = ANY_BLUE): Promise<MapPicture> => {
   const map = mapOf(page);
   const shoot = (): Promise<Buffer> => map.screenshot({ animations: 'disabled', scale: 'css' });
   const settled = async (previous: Buffer, triesLeft: number): Promise<Buffer> => {
@@ -186,7 +204,7 @@ const lookAtMap = async (page: Page): Promise<MapPicture> => {
     return done ? next : settled(next, triesLeft - 1);
   };
   const pixels = await pixelsOf(page, await settled(await shoot(), MAX_SETTLE_TRIES));
-  const kinds = classify(pixels, await controlMasks(map));
+  const kinds = classify(pixels, await controlMasks(map), blueMargin);
 
   return {
     width: pixels.width,
@@ -325,7 +343,7 @@ test('the demands map and table stay in sync', async ({ page }) => {
   await expect(table.getByRole('columnheader')).toHaveText(['Name', 'Country', 'Customer']);
   await expect(rows.first().getByRole('cell')).toHaveText(['North Field Survey', 'Norway', 'Acme Energy']);
   await expect(highlightedRows).toHaveCount(0);
-  const overview = await lookAtMap(page);
+  const overview = await lookAtMap(page, OUTLINE_BLUE);
 
   expect(overview.highlighted, 'no polygon is highlighted').toHaveLength(0);
   expect(overview.plain, 'the map shows all 20 polygons').toHaveLength(DEMAND_COUNT);
