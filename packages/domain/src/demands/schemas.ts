@@ -31,8 +31,8 @@ const RingSchema = z
   .refine(isClosedRing, { message: 'must end where it starts' });
 type Ring = z.infer<typeof RingSchema>;
 
-/** The outline first, then any holes. */
-const PolygonCoordinatesSchema = z.array(RingSchema).min(1);
+/** The outline first, then any holes. A polygon always has its outline. */
+const PolygonCoordinatesSchema = z.tuple([RingSchema], RingSchema);
 type Polygon = z.infer<typeof PolygonCoordinatesSchema>;
 
 /** A demand as the app uses it: unknown details from the file are dropped. */

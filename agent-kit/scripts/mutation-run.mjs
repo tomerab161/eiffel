@@ -7,7 +7,7 @@
 // Usage: [AGENT_KIT_MUTATION_SCOPE=all] node agent-kit/scripts/mutation-run.mjs && node agent-kit/scripts/mutation-gate.mjs
 import { spawnSync } from 'node:child_process'
 import { readFileSync, readdirSync, rmSync, statSync } from 'node:fs'
-import { join, relative, resolve } from 'node:path'
+import { join, relative, resolve, sep } from 'node:path'
 import { globToRegExp, loadConfig, root } from './lib.mjs'
 
 const config = loadConfig()
@@ -36,7 +36,7 @@ function walk(dir, out = []) {
     if (entry === 'node_modules' || entry.startsWith('.') || ['dist', 'coverage', 'reports'].includes(entry)) continue
     const full = join(dir, entry)
     if (statSync(full).isDirectory()) walk(full, out)
-    else out.push(relative(root, full))
+    else out.push(relative(root, full).split(sep).join('/'))
   }
   return out
 }

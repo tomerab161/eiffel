@@ -22,7 +22,7 @@ const ringContains = (ring: Ring, point: Position): boolean =>
 
 /** A polygon covers a point inside its outline and outside every hole. */
 const containsPoint = (polygon: Polygon, point: Position): boolean => {
-  const [outline = [], ...holes] = polygon;
+  const [outline, ...holes] = polygon;
 
   return ringContains(outline, point) && !holes.some((hole) => ringContains(hole, point));
 };

@@ -19,7 +19,7 @@ const pointExtent = ([lon, lat]: Position): Extent => ({ west: lon, south: lat, 
 
 /** A demand's extent comes from its outline alone: holes lie inside it. A valid outline has at least four positions. */
 const demandExtent = (demand: Demand): Extent => {
-  const [outline = []] = demand.polygon;
+  const [outline] = demand.polygon;
 
   return outline.map(pointExtent).reduce(union);
 };

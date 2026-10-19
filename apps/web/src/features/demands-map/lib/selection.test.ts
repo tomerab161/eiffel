@@ -56,6 +56,55 @@ it.each([
   expect(containsPoint(triangle.polygon, point as [number, number])).toBe(covered);
 });
 
+const raisedTriangle = demand('raised triangle', [
+  [0, 2],
+  [10, 2],
+  [0, 12],
+  [0, 2],
+]);
+
+it.each([
+  [[4.9, 6.9], true],
+  [[5.1, 7.1], false],
+])('a slanted edge away from the equator covers %j: %s', (point, covered) => {
+  expect(containsPoint(raisedTriangle.polygon, point as [number, number])).toBe(covered);
+});
+
+const notchedFromAbove = demand('notched from above', [
+  [0, 0],
+  [10, 0],
+  [10, 10],
+  [6, 5],
+  [0, 10],
+  [0, 0],
+]);
+const notchedFromBelow = demand('notched from below', [
+  [0, 0],
+  [6, 5],
+  [10, 0],
+  [10, 10],
+  [0, 10],
+  [0, 0],
+]);
+
+it.each([
+  ['above', notchedFromAbove],
+  ['below', notchedFromBelow],
+])('an outline notched from %s covers a point level with the notch corner', (_, notched) => {
+  expect(containsPoint(notched.polygon, [2, 5])).toBe(true);
+});
+
+it('a point on the west border of a demand is covered, on its east border it is not', () => {
+  expect([containsPoint(square.polygon, [0, 5]), containsPoint(square.polygon, [10, 5])]).toEqual([true, false]);
+});
+
+it('a point on the border two neighbouring demands share is picked for the eastern one', () => {
+  const west = demand('west', rectangle(0, 0, 10, 10));
+  const east = demand('east', rectangle(10, 0, 20, 10));
+
+  expect(pickDemand([east, west], [10, 5])).toBe(0);
+});
+
 it.each([
   [[5, 5], false],
   [[3.99, 5], true],
