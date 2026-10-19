@@ -75,7 +75,7 @@ const DemandsTable = ({ demands, selection, message, scrollAreaRef, onSelect }: 
         <tbody>
           {demands.map((demand, index) => (
             <DemandRow
-              key={keys[index]}
+              key={keys.at(index)}
               demand={demand}
               index={index}
               highlighted={isSelected(selection, index)}

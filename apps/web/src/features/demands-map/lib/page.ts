@@ -25,6 +25,6 @@ const mapSizeOf = (width: number, height: number): MapSize =>
 const rowKeys = (count: number): string[] => Array.from({ length: count }, (_, index) => `demand-${index}`);
 
 /** How many zoom steps a key press on the map asks for, if it is a zoom key. */
-const zoomStepsForKey = (key: string): number | undefined => ZOOM_KEYS[key];
+const zoomStepsForKey = (key: string): number | undefined => ZOOM_KEYS.get(key);
 
 export { demandsMessage, mapSizeOf, rowKeys, zoomStepsForKey };

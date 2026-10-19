@@ -2,7 +2,7 @@ import type { Demand, Ring } from '@app/domain';
 
 /** Reads the "(lon, lat)" pairs out of a step's text, in order. */
 const positionsIn = (text: string): Ring =>
-  [...text.matchAll(/\((-?\d+(?:\.\d+)?), (-?\d+(?:\.\d+)?)\)/g)].map((match): [number, number] => [
+  [...text.matchAll(/\((-?\d[\d.]*), (-?\d[\d.]*)\)/g)].map((match): [number, number] => [
     Number(match[1]),
     Number(match[2]),
   ]);

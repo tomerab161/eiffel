@@ -2,7 +2,7 @@
 const hasVisibleText = (value: string): boolean => value.trim().length > 0;
 
 const samePosition = (a: readonly number[], b: readonly number[]): boolean =>
-  a.length === b.length && a.every((value, index) => value === b[index]);
+  a.length === b.length && a.every((value, index) => value === b.at(index));
 
 /** A ring is closed when its last position repeats its first, number for number. */
 const isClosedRing = (ring: readonly (readonly number[])[]): boolean => {

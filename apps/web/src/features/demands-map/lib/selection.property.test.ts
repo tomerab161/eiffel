@@ -39,7 +39,7 @@ it('picking a point keeps the selection or selects a demand under the point', ()
       areas.chain((demands) => fc.tuple(fc.constant(demands), selectionAmong(demands), point)),
       ([demands, current, at]) => {
         const next = selectAtPoint(current, demands, at);
-        const picked = next === undefined ? undefined : demands[next];
+        const picked = next === undefined ? undefined : demands.at(next);
 
         expect(next === current || (picked !== undefined && containsPoint(picked.polygon, at))).toBe(true);
       },

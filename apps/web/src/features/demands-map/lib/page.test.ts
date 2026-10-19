@@ -43,6 +43,13 @@ it.each([
   expect(zoomStepsForKey(key)).toBe(steps);
 });
 
+it.each(['constructor', 'toString', '__proto__', 'hasOwnProperty'])(
+  'the key %s, a name every object inherits, does not zoom the map',
+  (key) => {
+    expect(zoomStepsForKey(key)).toBeUndefined();
+  },
+);
+
 it('keys rows by their position, so demands with the same name stay apart', () => {
   expect(rowKeys(3)).toEqual(['demand-0', 'demand-1', 'demand-2']);
 });

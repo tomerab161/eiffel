@@ -34,7 +34,7 @@ const useDemandsMap = (demands: readonly Demand[], size: MapSize): DemandsMap =>
   const view = movedView ?? initialView(demands, size);
 
   const selectRow = (index: number): void => {
-    const demand = demands[index];
+    const demand = demands.find((_, position) => position === index);
 
     setSelection(selectDemand(selection, index));
 

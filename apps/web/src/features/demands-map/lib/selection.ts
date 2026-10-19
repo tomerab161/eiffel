@@ -18,7 +18,7 @@ const crosses = ([x, y]: Position, [ax, ay]: Position, [bx, by]: Position): bool
   ay > y !== by > y && x < ((bx - ax) * (y - ay)) / (by - ay) + ax;
 
 const ringContains = (ring: Ring, point: Position): boolean =>
-  ring.slice(1).filter((end, index) => crosses(point, ring[index] ?? end, end)).length % EVEN === 1;
+  ring.slice(1).filter((end, index) => crosses(point, ring.at(index) ?? end, end)).length % EVEN === 1;
 
 /** A polygon covers a point inside its outline and outside every hole. */
 const containsPoint = (polygon: Polygon, point: Position): boolean => {

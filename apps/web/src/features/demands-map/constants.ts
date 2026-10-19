@@ -17,8 +17,12 @@ const MIN_ZOOM = 0;
 const MAX_ZOOM = 20;
 const ZOOM_STEP = 1;
 
-/** Keys that zoom the focused map, and by how many steps. */
-const ZOOM_KEYS: Readonly<Partial<Record<string, number>>> = { '+': ZOOM_STEP, '=': ZOOM_STEP, '-': -ZOOM_STEP };
+/** Keys that zoom the focused map, and by how many steps. A Map, so inherited names like "constructor" are not keys. */
+const ZOOM_KEYS: ReadonlyMap<string, number> = new Map([
+  ['+', ZOOM_STEP],
+  ['=', ZOOM_STEP],
+  ['-', -ZOOM_STEP],
+]);
 
 /** Room left around an extent the map frames. */
 const FIT_PADDING_PX = 24;

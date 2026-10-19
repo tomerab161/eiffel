@@ -68,7 +68,7 @@ const DemandPolygons = ({ demands, selection, view, size }: DemandPolygonsProps)
     <>
       {demands.map((demand, index) => (
         <path
-          key={keys[index]}
+          key={keys.at(index)}
           d={polygonPath(view, size, demand.polygon)}
           fillRule="evenodd"
           data-demand-index={index}
