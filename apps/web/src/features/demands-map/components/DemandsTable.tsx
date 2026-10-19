@@ -27,15 +27,40 @@ const rowStyle = (highlighted: boolean): CSSProperties => ({
   fontWeight: highlighted ? 'bold' : 'normal',
 });
 
-/** Thin: lists the demands and reports which row was chosen, by click or Enter. */
-const DemandsTable = ({ demands, selection, message, scrollAreaRef, onSelect }: DemandsTableProps): ReactElement => {
-  const keys = rowKeys(demands.length);
+interface DemandRowProps {
+  demand: Demand;
+  index: number;
+  highlighted: boolean;
+  onSelect: (index: number) => void;
+}
 
-  const handleKey = (event: KeyboardEvent, index: number): void => {
+/** One demand's row: chosen by click or Enter. */
+const DemandRow = ({ demand, index, highlighted, onSelect }: DemandRowProps): ReactElement => {
+  const handleKey = (event: KeyboardEvent): void => {
     if (event.key === ENTER_KEY) {
       onSelect(index);
     }
   };
+
+  return (
+    <tr
+      tabIndex={0}
+      aria-selected={highlighted}
+      data-demand-index={index}
+      style={rowStyle(highlighted)}
+      onClick={() => onSelect(index)}
+      onKeyDown={handleKey}
+    >
+      <td>{demand.name}</td>
+      <td>{demand.country}</td>
+      <td>{demand.customer}</td>
+    </tr>
+  );
+};
+
+/** Thin: lists the demands and reports which row was chosen. */
+const DemandsTable = ({ demands, selection, message, scrollAreaRef, onSelect }: DemandsTableProps): ReactElement => {
+  const keys = rowKeys(demands.length);
 
   return (
     <div ref={scrollAreaRef} style={scrollAreaStyle} data-table-scroll-area>
@@ -49,19 +74,13 @@ const DemandsTable = ({ demands, selection, message, scrollAreaRef, onSelect }: 
         </thead>
         <tbody>
           {demands.map((demand, index) => (
-            <tr
+            <DemandRow
               key={keys[index]}
-              tabIndex={0}
-              aria-selected={isSelected(selection, index)}
-              data-demand-index={index}
-              style={rowStyle(isSelected(selection, index))}
-              onClick={() => onSelect(index)}
-              onKeyDown={(event) => handleKey(event, index)}
-            >
-              <td>{demand.name}</td>
-              <td>{demand.country}</td>
-              <td>{demand.customer}</td>
-            </tr>
+              demand={demand}
+              index={index}
+              highlighted={isSelected(selection, index)}
+              onSelect={onSelect}
+            />
           ))}
         </tbody>
       </table>
